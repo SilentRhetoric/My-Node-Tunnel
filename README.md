@@ -1,0 +1,55 @@
+# My Node Tunnel
+
+This tutorial will teach you how to set up Tailscale and Caddy in conjunction with a home-based Algorand node so that it can be accessed easily from anywhere in the world while remaining private and not exposed to the open internet.
+
+These instructions were developed and tested using a node installed on Linux Debian 12.
+
+## Server Setup
+
+The host machine will be set up with an Algorand node, Tailscale to provide secure, remote VPN access, UFW for for a simple firewall, and Caddy to provide a reverse proxy in front of the node.
+
+### Algorand Node
+
+- Install NodeKit [https://nodekit.run](https://nodekit.run/) to manage a new or existing node
+- The node data directory that contains `config.json` and `algod.token` can be seen with `./nodekit debug`
+- In `config.json` set and note the EndpointAddress on which algod will listen for requests, such as `"EndpointAddress": "127.0.0.1:0"`
+- Copy the algod token, a secret required to access the algod REST API endpoint from `algod.token`
+
+### Tailscale on the Server
+
+- Install Tailscale <https://tailscale.com/kb/1347/installation>
+- Log into Tailscale and enable it
+- In dashboard, go to DNS and enable MagicDNS and HTTPS
+- Note the Tailnet name and your machine’s domain name will be `machinename.tailnet-name.ts.net`
+- Edit the Tailscale config file at `/etc/default/tailscaled` to include a variable that gives Caddy access to get certificates `TS_PERMIT_CERT_UID=caddy`.  See <https://tailscale.com/kb/1190/caddy-certificates> for more info.
+- Generate a TLS certificate with `sudo tailscale cert machinename-tailnet.name.ts.net`
+
+### UFW
+
+- Create allow rule for tailscale0 `sudo ufw allow in on tailscale0`
+- See <https://tailscale.com/kb/1077/secure-server-ubuntu> for more info
+
+### Caddy
+
+- Install Caddy <https://caddyserver.com/docs/install#debian-ubuntu-raspbian>
+- Edit the Caddyfile at `/etc/caddy/Caddyfile` to create the reverse proxy from the Tailscale machine address to the node and then `sudo systemctl reload caddy`. The file needs to be editable by Caddy, so don’t edit it with `sudo` or use `sudo -u caddy`.
+
+```
+machinename.tailnet-name-ts.net {
+    reverse_proxy http://ipaddress:port
+}
+```
+
+## Client Setup
+
+### Tailscale on the Client
+
+- Install Tailscale <https://tailscale.com/kb/1347/installation>
+- Log into Tailscale and enable it
+
+### Lora
+
+- Go to <https://lora.algokit.io>
+- In Settings click the `+ Create`  button to add a custom network
+- Select your wallets. Set the Algod server to your node address [`https://machinename.tailnet-name.ts.net`](https://machinename.tailnet-name.ts.net) and set the port to 443 for HTTPS.
+- If you have an indexer, enter its details here, or utilize Nodely’s indexer [`https://mainnet-idx.algonode.cloud`](https://mainnet-idx.algonode.cloud/) with port 443 and no token.
